@@ -15,20 +15,13 @@ jobs:
         ports:
           - 3306:3306
         env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.DB_NAME }}
+          MYSQL_ROOT_PASSWORD: rootpass123
+          MYSQL_DATABASE: project_db
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${{ secrets.DB_PASSWORD }} --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpass123 --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=30
-
-    env:
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_CONN_STR: ${{ secrets.DB_CONN_STR }}
 
     steps:
       - name: Checkout
@@ -37,12 +30,13 @@ jobs:
       - name: Install MySQL client & Python
         run: |
           sudo apt-get update
-          sudo apt-get install -y mysql-client
-          echo "MySQL client installed."
+          sudo apt-get install -y mysql-client python3-pip
+          echo "MySQL client and Python installed."
+
       - name: Wait for MySQL readiness
         run: |
           for i in {1..60}; do
-            if mysqladmin ping -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" --silent; then
+            if mysqladmin ping -h 127.0.0.1 -uroot -prootpass123 --silent; then
               echo "MySQL is up."
               break
             fi
@@ -53,34 +47,41 @@ jobs:
       # 1) Initial Schema Deployment
       - name: Create table
         run: |
-          mysql -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" < sql/01_create_table.sql
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/01_create_table.sql
 
       # 2) Schema Update
       - name: Add humidity column
         run: |
-          mysql -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" < sql/02_alter_add_humidity.sql
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/02_alter_add_humidity.sql
 
       # 3) Data Seeding
       - name: Seed sample data
         run: |
-          mysql -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" < sql/03_seed_data.sql
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/03_seed_data.sql
 
-      # 4) Concurrent Query Execution (python)
+      # 4) Concurrent Query Execution (Python)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10.11'
-      - name: Install Python deps
+
+      - name: Install Python dependencies
         run: pip install mysql-connector-python
+
       - name: Run concurrent workload
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: rootpass123
+          DB_NAME: project_db
         run: python scripts/multi_thread_queries.py
 
       # 5) Validation
       - name: Validation queries
         run: |
           mkdir -p artifacts
-          mysql -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" < sql/04_validate.sql | tee artifacts/validation_output.txt
-          echo "SHOW CREATE TABLE project_db.ClimateData\G" | mysql -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" | tee -a artifacts/validation_output.txt
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/04_validate.sql | tee artifacts/validation_output.txt
+          echo "SHOW CREATE TABLE project_db.ClimateData\G" | mysql -h 127.0.0.1 -uroot -prootpass123 project_db | tee -a artifacts/validation_output.txt
 
       - name: Upload artifacts (logs & validation)
         uses: actions/upload-artifact@v4
