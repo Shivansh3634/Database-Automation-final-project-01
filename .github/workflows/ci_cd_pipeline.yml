@@ -47,17 +47,17 @@ jobs:
       # 1) Initial Schema Deployment
       - name: Create table
         run: |
-          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/01_create_table.sql
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/create_table_01.sql
 
       # 2) Schema Update
       - name: Add humidity column
         run: |
-          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/02_alter_add_humidity.sql
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/alter_add_humidity_02.sql
 
       # 3) Data Seeding
       - name: Seed sample data
         run: |
-          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/03_seed_data.sql
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/seed_data_03.sql
 
       # 4) Concurrent Query Execution (Python)
       - name: Set up Python
@@ -80,7 +80,7 @@ jobs:
       - name: Validation queries
         run: |
           mkdir -p artifacts
-          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/04_validate.sql | tee artifacts/validation_output.txt
+          mysql -h 127.0.0.1 -uroot -prootpass123 project_db < sql/validate_04.sql | tee artifacts/validation_output.txt
           echo "SHOW CREATE TABLE project_db.ClimateData\G" | mysql -h 127.0.0.1 -uroot -prootpass123 project_db | tee -a artifacts/validation_output.txt
 
       - name: Upload artifacts (logs & validation)
